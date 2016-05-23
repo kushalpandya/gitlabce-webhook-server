@@ -1,10 +1,11 @@
 {
   "name": "gitlabce-webhook-server",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "GitLab CE local Webhook Server based on NodeJS to trigger some tasks when repo is updated.",
   "main": "GWServer.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node GWServer.js"
   },
   "repository": {
     "type": "git",
