@@ -22,6 +22,9 @@ var config = require("./config.json"),
     fnVerifyMatches,
     server;
 
+/**
+ * This method verifies conditions given in config[<hook_type>].matches against requestBody
+ */
 fnVerifyMatches = function(requestBody, matchesCollection) {
     var matchItem;
 
@@ -41,16 +44,27 @@ fnVerifyMatches = function(requestBody, matchesCollection) {
     return true;
 };
 
+/**
+ * This method does all the processing and command execution on requestBody.
+ */
 fnProcessRequest = function(requestBody) {
     var object_kind = requestBody.object_kind,
         satisfiesMatches = false,
-        hookConfig;
+        hookConfig,
+        i;
 
     hookConfig = config.hooks[object_kind];
-    if (typeof hookConfig.matches === "object")
-        satisfiesMatches = fnVerifyMatches(requestBody, hookConfig.matches);
+    if (typeof hookConfig.matches === "object") // Check if 'matches' map is provided with this hook type.
+        satisfiesMatches = fnVerifyMatches(requestBody, hookConfig.matches); // Verify matches.
     else
         satisfiesMatches = true;
+
+    // Run commandBatch only if matches are satisfied.
+    if (satisfiesMatches)
+    {
+        for (i = 0; i < commandBatch.length; i++)
+            shell.exec(commandBatch[i]); // Beware, this is DANGEROUS.
+    }
 };
 
 server = http.createServer(function(request, response) {
