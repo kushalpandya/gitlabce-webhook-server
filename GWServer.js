@@ -19,7 +19,39 @@ var config = require("./config.json"),
     port = config.listenerPort,
     supportedHooks = Object.keys(config.hooks),
     fnProcessRequest,
+    fnVerifyMatches,
     server;
+
+fnVerifyMatches = function(requestBody, matchesCollection) {
+    var matchItem;
+
+    for (matchItem in matchesCollection)
+    {
+        if (!requestBody.hasOwnProperty(matchItem))
+            return false;
+        else
+        {
+            if (requestBody[matchItem] === matchesCollection[matchItem])
+                continue;
+            else
+                return false;
+        }
+    }
+
+    return true;
+};
+
+fnProcessRequest = function(requestBody) {
+    var object_kind = requestBody.object_kind,
+        satisfiesMatches = false,
+        hookConfig;
+
+    hookConfig = config.hooks[object_kind];
+    if (typeof hookConfig.matches === "object")
+        satisfiesMatches = fnVerifyMatches(requestBody, hookConfig.matches);
+    else
+        satisfiesMatches = true;
+};
 
 server = http.createServer(function(request, response) {
     var reqHeaders = request.headers,
@@ -38,7 +70,10 @@ server = http.createServer(function(request, response) {
         // then respond accordingly.
         if (reqHeaders.hasOwnProperty('x-gitlab-event') &&
             supportedHooks.indexOf(reqBody.object_kind) > -1)
+        {
             response.statusCode = 200;
+            fnProcessRequest(reqBody);
+        }
         else
             response.statusCode = 400;
 
