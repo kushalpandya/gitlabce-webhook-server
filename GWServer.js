@@ -50,6 +50,7 @@ fnVerifyMatches = function(requestBody, matchesCollection) {
 fnProcessRequest = function(requestBody) {
     var object_kind = requestBody.object_kind,
         satisfiesMatches = false,
+        commandBatch,
         hookConfig,
         i;
 
@@ -62,6 +63,7 @@ fnProcessRequest = function(requestBody) {
     // Run commandBatch only if matches are satisfied.
     if (satisfiesMatches)
     {
+        commandBatch = hookConfig.commandBatch;
         for (i = 0; i < commandBatch.length; i++)
             shell.exec(commandBatch[i]); // Beware, this is DANGEROUS.
     }
