@@ -6,13 +6,7 @@
             "matches": {
                 "user_name": "Kushal Pandya"
             },
-            "commandBatch": [
-                "cd ~",
-                "cd /home/kushal/myproject",
-                "git pull origin master",
-                "grunt build",
-                "npm deploy"
-            ]
+            "commandBatch": "shellscript.sh"
         },
         "tag_push": {
 
