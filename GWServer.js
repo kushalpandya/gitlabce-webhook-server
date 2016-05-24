@@ -15,7 +15,7 @@
 var config = require("./config.json"),
     os = require("os"),
     http = require("http"),
-    shell = require("shelljs"),
+    proc = require("child_process"),
     port = config.listenerPort,
     supportedHooks = Object.keys(config.hooks),
     fnProcessRequest,
@@ -63,9 +63,11 @@ fnProcessRequest = function(requestBody) {
     // Run commandBatch only if matches are satisfied.
     if (satisfiesMatches)
     {
-        commandBatch = hookConfig.commandBatch;
-        for (i = 0; i < commandBatch.length; i++)
-            shell.exec(commandBatch[i]); // Beware, this is DANGEROUS.
+        // Beware, this is DANGEROUS.
+        proc.exec(hookConfig.commandBatch, function(error, stdout, stderr) {
+            console.log(stdout);
+            console.log(stderr);
+        });
     }
 };
 
