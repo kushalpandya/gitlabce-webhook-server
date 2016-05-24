@@ -32,8 +32,12 @@ server = http.createServer(function(request, response) {
     .on('end', function() {
         reqBody = JSON.parse(Buffer.concat(reqBody).toString());
 
-        // Check object_kind against supported hooks in config and respond accordingly.
-        if (supportedHooks.indexOf(reqBody.object_kind) > -1)
+        // Check if
+        // x-gitlab-event header is present in headers AND
+        // object_kind is one of the supported hooks in config
+        // then respond accordingly.
+        if (reqHeaders.hasOwnProperty('x-gitlab-event') &&
+            supportedHooks.indexOf(reqBody.object_kind) > -1)
             response.statusCode = 200;
         else
             response.statusCode = 400;
