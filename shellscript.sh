@@ -1,7 +1,5 @@
 #!/bin/bash
-# Change this script to run whatever commands you wish.
-cd ~
-cd /home/kushal/myproject
-git pull origin master
-grunt build
-npm deploy
+# Sample Bash Script
+# Change this script to run whatever commands you wish and include it in config.json.
+echo "Hello from GitLab CE Webhook Server!"
+git status
