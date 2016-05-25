@@ -50,6 +50,8 @@ fnVerifyMatches = function(requestBody, matchesCollection) {
 fnProcessRequest = function(requestBody) {
     var object_kind = requestBody.object_kind,
         satisfiesMatches = false,
+        pipedOutput = [],
+        errors = [],
         commandBatch,
         hookConfig,
         i;
@@ -64,9 +66,21 @@ fnProcessRequest = function(requestBody) {
     if (satisfiesMatches)
     {
         // Beware, this is DANGEROUS.
-        proc.exec(hookConfig.commandBatch, function(error, stdout, stderr) {
-            console.log(stdout);
-            console.log(stderr);
+        commandBatch = proc.spawn(hookConfig.commandBatch);
+
+        commandBatch.stdout.on('data', function(data) {
+            pipedOutput.push(data);
+        });
+
+        commandBatch.stderr.on('data', function(data) {
+            errors.push(data);
+        });
+
+        commandBatch.on('exit', function(status) {
+            if (status === 0)
+                console.log(Buffer.concat(pipedOutput).toString());
+            else
+                console.error('Hook Execution Terminated with status : %s \n', status, Buffer.concat(errors).toString());
         });
     }
 };
