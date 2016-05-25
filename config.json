@@ -6,7 +6,7 @@
             "matches": {
                 "user_name": "Kushal Pandya"
             },
-            "commandBatch": "shellscript.sh"
+            "commandBatch": "./shellscript.sh"
         },
         "tag_push": {
 
