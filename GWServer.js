@@ -68,17 +68,20 @@ fnProcessRequest = function(requestBody) {
         // Beware, this is DANGEROUS.
         commandBatch = proc.spawn(hookConfig.commandBatch);
 
+        // Collect Bash output.
         commandBatch.stdout.on('data', function(data) {
             pipedOutput.push(data);
         });
 
+        // Collect Bash errors.
         commandBatch.stderr.on('data', function(data) {
             errors.push(data);
         });
 
+        // Listen for end of commandBatch execution.
         commandBatch.on('exit', function(status) {
-            if (status === 0)
-                console.log(Buffer.concat(pipedOutput).toString());
+            if (status === 0) // Check if execution failed with non-Zero status
+                console.log(Buffer.concat(pipedOutput).toString()); // All good.
             else
                 console.error('Hook Execution Terminated with status : %s \n', status, Buffer.concat(errors).toString());
         });
