@@ -4,15 +4,15 @@
 // only change is adding "module.exports = " to beginning of file.
 //
 module.exports = {
-	"serverTitle": "ezproxy webhook listener",
+	"serverTitle": "gitlab webhook listener",
 	"hostname": "localhost", // remove for os.hostname()
 	"listenerPort": 9000,
 	"hooks": {
 		"push": {
-			"secretKey": "uerWkvxxb5PRBGSPdeA5mjjhEnjzh68X-ezproxy",
+			"secretKey": "SECRETKEYHERE",
 			"matches": {
 				"project.default_branch": "production",
-				"project.path_with_namespace": "ahlstn1/ezproxy"
+				"project.path_with_namespace": "username/reponame"
 			},
 			"commandBatch": "./shellscript.sh"
 		},
