@@ -12,115 +12,217 @@
  * Main Server Script.
  */
 
-var config = require("./config.json"),
-    os = require("os"),
-    http = require("http"),
-    proc = require("child_process"),
-    port = config.listenerPort,
-    supportedHooks = Object.keys(config.hooks),
-    fnProcessRequest,
-    fnVerifyMatches,
-    server;
+var config = require("./config.js"),
+	_ = require("./lookup.js"),
+	os = require("os"),
+	fs = require("fs"),
+	path = require("path"),
+	http = require("http"),
+	proc = require("child_process"),
+	port = config.listenerPort,
+	host = (config.hasOwnProperty("hostname") && config.hostname != null) ? config.hostname : os.hostname(),
+	supportedHooks = Object.keys(config.hooks),
+	fnProcessRequest,
+	fnVerifyMatches,
+	server;
+
+
+/**
+ * This method walks through the config.hooks to validate correct
+ * execute permission on the command line scripts.
+ */
+fnValidateConfig = function(sH) {
+	for (var i = 0; i < sH.length; i++) {
+		// read properties from config.js
+		file = _.lookup(config.hooks, sH[i] +".commandBatch");
+		loc  = _.lookup(config.hooks, sH[i] + ".commandDir");
+
+		// gynmastics to create a file path
+		loc = loc == null ? "" : loc;
+		file = path.join(loc, file);
+
+		// check if we can execute this file.
+		try {
+			fs.accessSync(file, 
+			    fs.constants.F_OK | fs.constants.R_OK | 
+		            fs.constants.X_OK);
+		} catch (e) {
+			console.log("Missing file or execute permissions on file: " + file);
+			console.log("Recommend running chmod +x " + file);
+			// exiting hard with a big bad error
+			process.exit();
+		}
+	}
+};
+
 
 /**
  * This method verifies conditions given in config[<hook_type>].matches against requestBody
  */
 fnVerifyMatches = function(requestBody, matchesCollection) {
-    var matchItem;
+	var matchItem;
 
-    for (matchItem in matchesCollection)
-    {
-        if (!requestBody.hasOwnProperty(matchItem))
-            return false;
-        else
-        {
-            if (requestBody[matchItem] === matchesCollection[matchItem])
-                continue;
-            else
-                return false;
-        }
-    }
+	for (matchItem in matchesCollection)
+	{
+		console.log("match: " + matchItem + 
+		    " value: " + _.lookup(requestBody, matchItem) + 
+		    " compare to: " + matchesCollection[matchItem]);
 
-    return true;
+		if (matchesCollection[matchItem] === _.lookup(requestBody,matchItem) )
+			continue;
+		else
+			return false;
+	}
+
+	return true;
 };
+
+
+fnCheckRequest = function(reqHeaders, type) {
+
+	var token, secretKey;
+
+	if ( reqHeaders.hasOwnProperty('x-gitlab-token') ) {
+		token = reqHeaders['x-gitlab-token'];
+	}
+	else {
+		return false;
+	}
+
+	if (reqHeaders.hasOwnProperty('x-gitlab-event') &&
+		supportedHooks.indexOf(type) > -1)
+	{
+		secretKey = config.hooks[type]["secretKey"];
+	}
+	else {
+		return false;
+	}
+	
+	if ( token === secretKey ) {
+		//console.info("token = %s, secretKey = %s", token, secretKey);
+		return true;
+	}
+
+	return false;
+}
 
 /**
  * This method does all the processing and command execution on requestBody.
  */
 fnProcessRequest = function(requestBody) {
-    var object_kind = requestBody.object_kind,
-        satisfiesMatches = false,
-        pipedOutput = [],
-        errors = [],
-        commandBatch,
-        hookConfig,
-        i;
+	var object_kind = requestBody.object_kind,
+		satisfiesMatches = false,
+		pipedOutput = [],
+		errors = [],
+		commandBatch,
+		hookConfig,
+		i;
 
-    hookConfig = config.hooks[object_kind];
-    if (typeof hookConfig.matches === "object") // Check if 'matches' map is provided with this hook type.
-        satisfiesMatches = fnVerifyMatches(requestBody, hookConfig.matches); // Verify matches.
-    else
-        satisfiesMatches = true;
+	// retrieve the configuration for this hook-type.
+	hookConfig = config.hooks[object_kind];
+	
+	// Check if 'matches' map is provided with this hook type.
+	if (typeof hookConfig.matches === "object") {
+		// Verify matches - run comparisons.
+		satisfiesMatches = fnVerifyMatches(requestBody, hookConfig.matches);
+	}
+	else {
+		// no "matches" map in config.js; skip comparison; satisfies = true
+		satisfiesMatches = true;
+	}
 
-    // Run commandBatch only if matches are satisfied.
-    if (satisfiesMatches)
-    {
-        // Beware, this is DANGEROUS.
-        commandBatch = proc.spawn(hookConfig.commandBatch);
+	console.info("match %s at %s", satisfiesMatches, new Date());
 
-        // Collect Bash output.
-        commandBatch.stdout.on('data', function(data) {
-            pipedOutput.push(data);
-        });
+	// Run commandBatch only if matches are satisfied.
+	if (satisfiesMatches)
+	{
+		console.info("running %s at %s", 
+		    hookConfig.commandBatch, new Date());
 
-        // Collect Bash errors.
-        commandBatch.stderr.on('data', function(data) {
-            errors.push(data);
-        });
+		options = {
+			"cwd": _.lookup(hookConfig, "commandDir")
+		};
 
-        // Listen for end of commandBatch execution.
-        commandBatch.on('exit', function(status) {
-            if (status === 0) // Check if execution failed with non-Zero status
-                console.log(Buffer.concat(pipedOutput).toString()); // All good.
-            else
-                console.error('Hook Execution Terminated with status : %s \n', status, Buffer.concat(errors).toString());
-        });
-    }
+		// Beware, this is DANGEROUS.
+		commandBatch = proc.spawn(hookConfig.commandBatch, 
+		    options);
+
+		// Collect command output.
+		commandBatch.stdout.on('data', function(data) {
+			pipedOutput.push(data);
+		});
+
+		// Collect command errors.
+		commandBatch.stderr.on('data', function(data) {
+			errors.push(data);
+		});
+
+		// Listen for end of commandBatch execution.
+		commandBatch.on('exit', function(status) {
+			if (status === 0) // Check if execution failed with non-Zero status
+				console.log(Buffer.concat(pipedOutput).toString()); // All good.
+			else
+				console.error('Hook Execution Terminated with status : %s \n', status, Buffer.concat(errors).toString());
+		});
+	}
 };
 
 server = http.createServer(function(request, response) {
-    var reqHeaders = request.headers,
-        reqBody = [];
+	var reqHeaders = request.headers,
+		reqBody = [];
 
-    request
-    .on('data', function(chunk) {
-        reqBody.push(chunk);
-    })
-    .on('end', function() {
-        reqBody = JSON.parse(Buffer.concat(reqBody).toString());
+	//console.log(request.method);
+	if (request.method == 'GET') {
+		response.statusCode = 404;
+		response.end();
+		return;
+	}
 
-        // Check if
-        // x-gitlab-event header is present in headers AND
-        // object_kind is one of the supported hooks in config
-        // then respond accordingly.
-        if (reqHeaders.hasOwnProperty('x-gitlab-event') &&
-            supportedHooks.indexOf(reqBody.object_kind) > -1)
-        {
-            response.statusCode = 200;
-            fnProcessRequest(reqBody);
-        }
-        else
-            response.statusCode = 400;
+	request
+	.on('data', function(chunk) {
+		reqBody.push(chunk);
+	})
+	.on('end', function() {
+		reqBody = JSON.parse(Buffer.concat(reqBody).toString());
 
-        response.end();
-    });
+		//
+		// Check if
+		// x-gitlab-event header is present in headers 
+		// AND object_kind is one of the supported hooks in config.js
+		// AND x-gitlab-token matches the secretKey in config.js
+		// then respond accordingly.
+		//
+		if ( fnCheckRequest(reqHeaders, reqBody.object_kind) )
+		{
+			console.info("fnCheckRequest passed");
+			response.statusCode = 200;
+			fnProcessRequest(reqBody);
+		}
+		else {
+			console.info("fnCheckRequest failed");
+			response.statusCode = 400;
+		}
+
+		response.end();
+	});
 });
 
-server.listen(port, function() {
-    console.info("%s started on %s:%d at %s",
-        config.serverTitle,
-        os.hostname(),
-        port,
-        new Date()
-    );
+
+/*
+ * function to look through config.js to verify execute permissions
+ * on all "commandBatch" files.
+ */
+fnValidateConfig(supportedHooks);
+
+
+/*
+ * begin nodejs httpd server listening on specified ports/hostnames.
+ */
+server.listen(port, host, function() {
+	console.info("%s started on %s:%d at %s",
+		config.serverTitle,
+		host,
+		port,
+		new Date()
+	);
 });
