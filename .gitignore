@@ -1,3 +1,6 @@
+# temporary VI files
+.*.swp
+
 # Logs
 logs
 *.log
